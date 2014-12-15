@@ -1,0 +1,352 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Crystaldan.GitHub.io by crystaldan</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">Crystaldan.GitHub.io</h1>
+        <p class="header"></p>
+
+
+
+        <ul>
+          <li><a class="buttons github" href="https://github.com/crystaldan">GitHub Profile</a></li>
+        </ul>
+
+      </header>
+      <section>
+        <h1>
+<a id="openstack-juno-installation-on-fedora-20" class="anchor" href="#openstack-juno-installation-on-fedora-20" aria-hidden="true"><span class="octicon octicon-link"></span></a>Openstack Juno Installation on Fedora 20</h1>
+
+<p>This guide aims to how to install Openstack latest version "Juno" on Fedora 20 manually .</p>
+
+<h3>
+<a id="three-node-architecture-about-openstack" class="anchor" href="#three-node-architecture-about-openstack" aria-hidden="true"><span class="octicon octicon-link"></span></a>Three-node Architecture about Openstack</h3>
+
+<p>Following is the deployment architecture about Openstack:</p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/a0qgObt.png" alt="Openstack Arichitecture"></p>
+
+<h3>
+<a id="installation-env-preparation" class="anchor" href="#installation-env-preparation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation Env Preparation</h3>
+
+<ul>
+<li>Controller Node: 1 processor,2 GB memory,5 GB storage</li>
+<li>Network Node: 1 processor,512 MB memory,5 GB storage</li>
+<li>Compute Node: 1 processor,2 GB memory,10 GB storage</li>
+</ul>
+
+<p>Above is a minimal installation of Linux distribution. More resource will be better. All nodes can be deployed on either virtual machine or real machine. This guide based on virtual machine using KVM.</p>
+
+<h3>
+<a id="preparation-before-installation" class="anchor" href="#preparation-before-installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preparation Before Installation</h3>
+
+<p>Here are some preparations should be done before Juno's installation. It's fairly important for not make these things done will bring unexpected troubles. Following preparations should be performed on all nodes.</p>
+
+<h4>
+<a id="1-virtual-and-network-configuration" class="anchor" href="#1-virtual-and-network-configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>1. Virtual and Network configuration</h4>
+
+<p>You should config your network on three node according to architecture above.</p>
+
+<p>Networks:</p>
+
+<pre><code> Net0:
+      Name:Net0
+      Purpose:Management network
+      IP block:10.0.0.0/24
+ Net1:
+      Name:Net1
+      Purpose:Internel Tunnels
+      IP block:10.0.1.0/24
+ Net2:
+      Name:Net2
+      Purpose:Externel network
+      IP block:
+</code></pre>
+
+<p>Virtual machines:</p>
+
+<pre><code> VM0:
+     Name:controller
+     vCPU:4
+     Memory:4G
+     Disk:20G
+     Networks:Net0
+ VM1:
+     Name:compute
+     vCPU:4
+     Memory:4G
+     Disk:20G
+     Networks:Net0,Net1
+ VM2:
+     Name:network
+     vCPU:4
+     Memory:4G
+     Disk:20G
+     Networks:Net0,Net1,Net2
+</code></pre>
+
+<p>Network config:</p>
+
+<pre><code> controller:
+     eth0:10.0.0.11  (management network)
+     eth1:           (disabled)
+     eth2:           (disabled)
+
+ network:
+     eth0:10.0.0.21  (management network)
+     eth1:10.0.1.21  (Internel network)
+     eth2:           (Externel network)
+
+ compute:
+     eth0:10.0.0.31  (management network)
+     eth1:10.0.1.31  (Internel network)
+     eth2:           (disabled)
+</code></pre>
+
+<h4>
+<a id="2-hostname-configuration" class="anchor" href="#2-hostname-configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>2. Hostname configuration</h4>
+
+<p>Not just name your node localhost, named them 'controller'、'network'、'compute'. </p>
+
+<p>Take controller node as an example:</p>
+
+<pre><code>   1. # vi /etc/hostname 
+
+   2. edit "controller"
+</code></pre>
+
+<p><img src="https://geekpics.net/images/2014/12/11/hUK14y.png" alt="hostname"></p>
+
+<h4>
+<a id="3-yum-repo-configuration" class="anchor" href="#3-yum-repo-configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>3. Yum repo configuration</h4>
+
+<p>Config yum repo to get Fedora 20 package.</p>
+
+<pre><code>    1. # cd /etc/yum.repos.d
+
+    2. # vi rdo-release.repo 
+
+    3. Add following content:
+       [openstack-juno]
+       name=OpenStack Juno Repository
+       baseurl=http://repos.fedorapeople.org/repos/openstack/openstack-juno/fedora-20
+       enabled=1
+       skip_if_unavailable=0
+       gpgcheck=1
+       gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-RDO-Juno
+</code></pre>
+
+<h4>
+<a id="4-install-openstack-packages" class="anchor" href="#4-install-openstack-packages" aria-hidden="true"><span class="octicon octicon-link"></span></a>4. Install Openstack packages</h4>
+
+<pre><code>    1. # yum install yum-plugin-priorities
+
+    2. # yum install http://rdo.fedorapeople.org/openstack-juno/rdo-release-juno.rpm
+
+    3. # yum upgrade
+</code></pre>
+
+<h4>
+<a id="5-ntp-configuration" class="anchor" href="#5-ntp-configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>5. NTP configuration</h4>
+
+<p>All node:</p>
+
+<pre><code>    1. # yum install ntp
+</code></pre>
+
+<p>Controller node:</p>
+
+<pre><code>    1. # vi /etc/ntp.conf
+
+    2. Add following content:
+       server 127.127.1.0
+</code></pre>
+
+<p>Other node(except controller):</p>
+
+<pre><code>    1. # vi /etc/ntp.conf
+
+    2. Add following content:
+       server 10.0.0.11
+       fudge 10.0.0.11 stratum 10 #LCL is unsynchronized
+</code></pre>
+
+<p>Verification:  </p>
+
+<pre><code>    1. # ntpdate -u 10.0.0.11
+    2. # service ntpd restart
+    3. # ntpq -p
+</code></pre>
+
+<h4>
+<a id="6-firewall-configuration" class="anchor" href="#6-firewall-configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>6. Firewall configuration</h4>
+
+<p>You should stop firewall service on every node.</p>
+
+<pre><code>    1. # systemctl stop firewalld.service
+    2. # systemctl disable firewalld.service
+</code></pre>
+
+<p>Verification:</p>
+
+<pre><code>    1. # systemctl status firewalld.service
+</code></pre>
+
+<p>Then you will see following result:
+<img src="https://geekpics.net/images/2014/12/11/ZMtY6.png" alt="Firewalld"></p>
+
+<h4>
+<a id="7-openstack-utils-installation" class="anchor" href="#7-openstack-utils-installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>7. Openstack-utils installation</h4>
+
+<p>You can install openstack-utils. It can help use command to config file.</p>
+
+<pre><code>    1. # yum install -y openstack-utils
+</code></pre>
+
+<p>You can run following command to see how to use this tool:</p>
+
+<pre><code>    1. # openstack-config --help
+</code></pre>
+
+<h3>
+<a id="database-installation" class="anchor" href="#database-installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Database Installation</h3>
+
+<p>You should install database in controller node, here is MySQL. Refer to the <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_basic_environment.html#basics-database">Database Installation</a> step by step.</p>
+
+<p>Verification:
+You can login in your database by following command:</p>
+
+<pre><code>    1. # mysql -u root -p
+</code></pre>
+
+<h3>
+<a id="messaging-server-installation" class="anchor" href="#messaging-server-installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Messaging Server Installation</h3>
+
+<p>Services use a message broker to communicate in OpenStack, so you should install  messaging server on controller node, here is RabbitMQ. Refer to the <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_basic_environment.html#basics-messaging-server">RabbitMQ Installation</a>.</p>
+
+<p>Following are some details you should pay attention during the RabbitMQ installation:
+(1) Not use default user 'guest' of RabbitMQ, it's better for you to create a new user and give the user permissions. Take an example to create user with name 'demo' and password 'demo':</p>
+
+<pre><code>    1. # rabbitmqctl add_user demo demo
+    2. # rabbitmqctl set_permissions -p / demo ".*" ".*" ".*" 
+</code></pre>
+
+<p>(2) RabbitMQ start on IPV6 on default, so you shoud set parameters to config it:</p>
+
+<pre><code>    1. # vi /etc/rabbitmq/rabbitmq-env.conf
+    2. Add following content:
+       NODE_IP_ADDRESS=0.0.0.0
+       NODE_PORT=5672 
+</code></pre>
+
+<p>You can see following content in /var/log/rabbitmq/rabbit@controller.log if RabbitMQ start normally on IPv4:</p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/rh27sotIQe.png" alt="RabbitMQ Start"></p>
+
+<h3>
+<a id="openstack-service-installation" class="anchor" href="#openstack-service-installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Openstack Service Installation</h3>
+
+<p>After operations above, you can install openstack own service now.</p>
+
+<h4>
+<a id="1-identity-service-installation--configuration" class="anchor" href="#1-identity-service-installation--configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>1. Identity service installation &amp; configuration</h4>
+
+<p>Openstack use Keystone as identity service to verify users and provide other services' API endpoints. You should install and config it on controller node. Refer to the <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_keystone.html">Keystone Installation</a>.</p>
+
+<ul>
+<li>Note: One thing you should notice is that when you grant database access priviledge, you should grant not only localhost and other but also controller.</li>
+</ul>
+
+<p>Take an example for keystone database:</p>
+
+<pre><code>   1. MariaDB [(none)]&gt; GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'KEYSTONE_DBPASS';
+   2. MariaDB [(none)]&gt; GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'KEYSTONE_DBPASS';
+   3. MariaDB [(none)]&gt; GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'controller' IDENTIFIED BY 'KEYSTONE_DBPASS';
+</code></pre>
+
+<p>You shoule do database priviledge grant like this in every following step.</p>
+
+<p>You can verify whether keystone is installed right refer to the verify operation part. And you can login in your database to see what happened.</p>
+
+<h4>
+<a id="2-image-service-installtion--configuration" class="anchor" href="#2-image-service-installtion--configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>2. Image service installtion &amp; configuration</h4>
+
+<p>Openstack use Glance as image service to discover, register, and retrieve virtual machine images. You should install and config it on controller node. Refer to the <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_glance.html">Glance Installation</a>.</p>
+
+<ul>
+<li>Note: For simplicity, this guide describes configuring the Image Service to use the file back end, which uploads and stores in a directory on the controller node hosting the Image Service. By default, this directory is /var/lib/glance/images/.</li>
+</ul>
+
+<p>After you finish successfully, you can see following result:</p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/nX0me.png" alt="Glance_api"></p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/n1WJ875.png" alt="Glance_file">  </p>
+
+<h4>
+<a id="3-compute-service-installation--configuration" class="anchor" href="#3-compute-service-installation--configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>3. Compute service installation &amp; configuration</h4>
+
+<p>Openstack use Nova as compute service to host and manage cloud computing systems. You should install and config it on both controller node and compute node. Refer to <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_nova.html">Nova Installation</a>.</p>
+
+<p>After you finish successfully, you can see following result:</p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/Nr7Oq9.png" alt="Nova_check_service "> </p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/7OwIP.png" alt="Nova_check_image "> </p>
+
+<h4>
+<a id="4-network-service-installation--configuration" class="anchor" href="#4-network-service-installation--configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>4. Network service installation &amp; configuration</h4>
+
+<p>Openstack use Neutron as network service to manage all networking facets. You should install and config it on all three node. Refer to <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/section_neutron-networking.html">Neutron Installation</a>.</p>
+
+<p>After you finish successfully, you can see following result:
+ <img src="https://geekpics.net/images/2014/12/11/NOkrRy.png" alt="Neutron_check_agent"> </p>
+
+<h4>
+<a id="5-initial-networks" class="anchor" href="#5-initial-networks" aria-hidden="true"><span class="octicon octicon-link"></span></a>5. Initial networks</h4>
+
+<p>You should create the necessary virtual network infrastructure, including the externel network and tenant network. Refer to <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/neutron-initial-networks.html">Network Initial</a>.</p>
+
+<p>After you finish successfully, you can check it by neutron-api:
+ <img src="https://geekpics.net/images/2014/12/11/9E46jlZQK.png" alt="Neutron_api"></p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/x9Giorc4.png" alt="Neutron_success_result"></p>
+
+<p>You can launch an instance by nova-api:
+ <img src="https://geekpics.net/images/2014/12/11/UkM4A.png" alt="Nova_boot"> </p>
+
+<h4>
+<a id="6-dashboard-service-install--configuration" class="anchor" href="#6-dashboard-service-install--configuration" aria-hidden="true"><span class="octicon octicon-link"></span></a>6. Dashboard service install &amp; configuration</h4>
+
+<p>Openstack use Horizon as dashboard service to provide a web interface for users. You should install and config it on controller node. Refer to <a href="http://docs.openstack.org/juno/install-guide/install/yum/content/ch_horizon.html">Horizon Installation</a>.</p>
+
+<p>After you finish successfully, you can access the dashboard using a web browser with url "http://controller/dashboard":</p>
+
+<p><img src="https://geekpics.net/images/2014/12/11/Dfdw5qoE.png" alt="Dashboard"> </p>
+
+<p>Note: You should run following command before you open the url.
+ <img src="https://geekpics.net/images/2014/12/11/rXJ1TaKY.png" alt="Dashboard_note"></p>
+
+<p>Now, you have finished all core components' installation work about Openstack!</p>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="http://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
